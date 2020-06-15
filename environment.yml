@@ -1,0 +1,9 @@
+name: ameynert-bam2fastq-dev
+channels:
+ - conda-forge
+ - bioconda
+ - defaults
+dependencies:
+ - samtools=1.9
+ - fastqc=0.11.8
+ - biobambam=2.0.87
