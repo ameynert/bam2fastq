@@ -13,13 +13,15 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run ameynert/bam2fastq --bams 'dir/*.bam' --outdir /path/to/outdir
+    nextflow run ameynert/bam2fastq --input 'dir/*.bam' --outdir /path/to/outdir
 
     Mandatory arguments:
-      --bams                 Path to input data (must be surrounded with quotes)
+      --input                Path to input data (must be surrounded with quotes)
       --outdir               The output directory where the results will be saved
 
     Other options:
+      --cram                 Flag that input is CRAM files
+      --reference            If the input is CRAM files, path to the reference FASTA file
       -name                  Name for the pipeline run. If not specified, Nextflow will automatically generate a random mnemonic
 
     """.stripIndent()
@@ -42,7 +44,7 @@ if (!(workflow.runName ==~ /[a-z]+_[a-z]+/)) {
     custom_runName = workflow.runName
 }
 
-if (!params.bams) {
+if (!params.input) {
     exit 1, "Input files not specified"
 }
 
@@ -50,11 +52,18 @@ if (!params.outdir) {
     exit 1, "Output directory not specified"
 }
 
+if (params.cram) {
+  if (!params.reference) {
+    exit 1, "Reference must be specified for CRAM files"
+  }
+  reference_ch = Channel.fromPath(params.reference)
+}
+
 /*
  * Create a channel for input alignment files
  */
 Channel
-  .fromFilePairs( params.bams, size: 1 )
+  .fromFilePairs( params.input, size: 1 )
   .ifEmpty { exit 1, "Cannot find any files matching ${params.bams}\nNB: Path needs to be enclosed in quotes!\nNB: Path requires at least one * wildcard!" }
   .into {alignment_sort_ch ; alignment_flagstat_ch }
 
@@ -62,18 +71,35 @@ Channel
 /*
  * STEP 1 - sort the input alignment file by read name
  */
-process sortAlignment {
+if (params.cram) {
+  process sortCramAlignment {
 
-  input:
-  set val(name), file(alignment) from alignment_sort_ch
+    input:
+    set val(name), file(alignment) from alignment_sort_ch
+    file(reference) from reference_ch
 
-  output:
-  set val(name), file("*.bam") into sorted_alignment_ch
+    output:
+    set val(name), file("*.bam") into sorted_alignment_ch
 
-  script:
-  """
-  samtools sort -@ ${task.cpus} -l 1 -o ${name}_sorted.bam -O bam -n ${alignment}
-  """
+    script:
+    """
+    samtools sort -@ ${task.cpus} -l 1 -o ${name}_sorted.bam -O bam --reference ${reference} -n ${alignment}
+    """
+  }
+} else {
+  process sortBamAlignment {
+
+    input:
+    set val(name), file(alignment) from alignment_sort_ch
+
+    output:
+    set val(name), file("*.bam") into sorted_alignment_ch
+
+    script:
+    """
+    samtools sort -@ ${task.cpus} -l 1 -o ${name}_sorted.bam -O bam -n ${alignment}
+    """
+  }
 }
 
 /*
