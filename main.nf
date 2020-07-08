@@ -56,7 +56,7 @@ if (params.cram) {
   if (!params.reference) {
     exit 1, "Reference must be specified for CRAM files"
   }
-  reference_ch = Channel.fromPath(params.reference)
+  reference = file(params.reference)
 }
 
 /*
@@ -76,7 +76,6 @@ if (params.cram) {
 
     input:
     set val(name), file(alignment) from alignment_sort_ch
-    file(reference) from reference_ch
 
     output:
     set val(name), file("*.bam") into sorted_alignment_ch
