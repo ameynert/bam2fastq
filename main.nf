@@ -69,36 +69,37 @@ Channel
 
 
 /*
- * STEP 1 - sort the input alignment file by read name
+ * STEP 1 - Collate reads and extract FASTQ
  */
-if (params.cram) {
-  process sortCramAlignment {
+process extractFastq {
 
-    input:
-    set val(name), file(alignment) from alignment_sort_ch
+  publishDir params.outdir, mode: 'copy'
 
-    output:
-    set val(name), file("*.bam") into sorted_alignment_ch
+  input:
+  set val(name), file(alignment) from alignment_sort_ch
 
-    script:
-    """
-    samtools sort -@ ${task.cpus} -l 1 -o ${name}_sorted.bam -O bam --reference ${reference} -n ${alignment}
-    """
-  }
-} else {
-  process sortBamAlignment {
+  output:
+  set val(name), file('*.fastq.gz') into fastq_ch
 
-    input:
-    set val(name), file(alignment) from alignment_sort_ch
-
-    output:
-    set val(name), file("*.bam") into sorted_alignment_ch
-
-    script:
-    """
-    samtools sort -@ ${task.cpus} -l 1 -o ${name}_sorted.bam -O bam -n ${alignment}
-    """
-  }
+  script:
+  """
+  samtools collate -Ou -@ ${task.cpus - 1} ${alignment} | \
+  bamtofastq \
+    gz=1 \
+    F=${name}_R1.fastq.gz \
+    F2=${name}_R2.fastq.gz \
+    S=${name}_S.fastq.gz \
+    O=${name}_U1.fastq.gz \
+    O2=${name}_U2.fastq.gz
+  for file in *.fastq.gz
+  do
+    check=`zcat \${file} | head -n 1 | wc -l`
+    if [ \$check -ne '1' ]
+    then
+      rm \$file
+    fi
+  done
+  """
 }
 
 /*
@@ -127,43 +128,7 @@ process readStats {
 }
 
 /*
- * STEP 3 - Extract FASTQ files
- */
-process extractFastq {
-
-  publishDir params.outdir, mode: 'copy'
-
-  input:
-  set val(name), file(alignment) from sorted_alignment_ch
-
-  output:
-  set val(name), file('*.fastq.gz') into fastq_ch
-
-  script:
-  """
-  bamtofastq \
-    filename=${alignment} \
-    collate=1 \
-    gz=1 \
-    F=${name}_R1.fastq.gz \
-    F2=${name}_R2.fastq.gz \
-    S=${name}_S.fastq.gz \
-    O=${name}_U1.fastq.gz \
-    O2=${name}_U2.fastq.gz
-
-  for file in *.fastq.gz
-  do
-    check=`zcat \${file} | head -n 1 | wc -l`
-    if [ \$check -ne '1' ]
-    then
-      rm \$file
-    fi
-  done
-  """
-}
-
-/*
- * STEP 4 - FastQC on the output FASTQ files.
+ * STEP 3 - FastQC on the output FASTQ files.
  */
 process fastQC {
 
@@ -188,7 +153,7 @@ process fastQC {
 }
 
 /*
- * STEP 5 - Collect all the counts and check them
+ * STEP 4 - Collect all the counts and check them
  */
 process checkCounts {
 
