@@ -18,6 +18,7 @@ def helpMessage() {
     Mandatory arguments:
       --input                Path to input data (must be surrounded with quotes)
       --outdir               The output directory where the results will be saved
+      --tmpdir               Directory for large temporary files
 
     Other options:
       --cram                 Flag that input is CRAM files
@@ -52,6 +53,10 @@ if (!params.outdir) {
     exit 1, "Output directory not specified"
 }
 
+if (!params.tmpdir) {
+    exit 1, "Temporary directory not specified"
+}
+
 if (params.cram) {
   if (!params.reference) {
     exit 1, "Reference must be specified for CRAM files"
@@ -83,7 +88,7 @@ process extractFastq {
 
   script:
   """
-  samtools collate -Ou -@ ${task.cpus - 1} ${alignment} | \
+  samtools collate -Ou ${alignment} ${params.tmpdir}/${name} | \
   bamtofastq \
     gz=1 \
     F=${name}_R1.fastq.gz \
