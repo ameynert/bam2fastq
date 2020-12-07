@@ -61,7 +61,7 @@ if (params.cram) {
   if (!params.reference) {
     exit 1, "Reference must be specified for CRAM files"
   }
-  reference = file(params.reference)
+  reference_ch = Channel.value(file(params.reference))
 }
 
 /*
@@ -76,7 +76,41 @@ Channel
 /*
  * STEP 1 - Collate reads and extract FASTQ
  */
-process extractFastq {
+if (params.cram) {
+process extractFastqCram {
+
+  publishDir params.outdir, mode: 'copy'
+
+  input:
+  set val(name), file(alignment) from alignment_sort_ch
+  file(reference) from reference_ch
+
+  output:
+  set val(name), file('*.fastq.gz') into fastq_ch
+
+  script:
+  """
+  samtools view -b -T ${reference} ${alignment} |
+  samtools collate -Ou - ${params.tmpdir}/${name} | \
+  bamtofastq \
+    gz=1 \
+    F=${name}_R1.fastq.gz \
+    F2=${name}_R2.fastq.gz \
+    S=${name}_S.fastq.gz \
+    O=${name}_U1.fastq.gz \
+    O2=${name}_U2.fastq.gz
+  for file in *.fastq.gz
+  do
+    check=`zcat \${file} | head -n 1 | wc -l`
+    if [ \$check -ne '1' ]
+    then
+      rm \$file
+    fi
+  done
+  """
+}
+} else {
+process extractFastqBam {
 
   publishDir params.outdir, mode: 'copy'
 
@@ -105,6 +139,7 @@ process extractFastq {
     fi
   done
   """
+}
 }
 
 /*
