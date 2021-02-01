@@ -69,7 +69,7 @@ if (params.cram) {
  */
 Channel
   .fromFilePairs( params.input, size: 1 )
-  .ifEmpty { exit 1, "Cannot find any files matching ${params.bams}\nNB: Path needs to be enclosed in quotes!\nNB: Path requires at least one * wildcard!" }
+  .ifEmpty { exit 1, "Cannot find any files matching ${params.input}\nNB: Path needs to be enclosed in quotes!\nNB: Path requires at least one * wildcard!" }
   .into {alignment_sort_ch ; alignment_flagstat_ch }
 
 
