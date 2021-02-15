@@ -123,13 +123,7 @@ process extractFastqBam {
   script:
   """
   samtools collate -Ou ${alignment} ${params.tmpdir}/${name} | \
-  bamtofastq \
-    gz=1 \
-    F=${name}_R1.fastq.gz \
-    F2=${name}_R2.fastq.gz \
-    S=${name}_S.fastq.gz \
-    O=${name}_U1.fastq.gz \
-    O2=${name}_U2.fastq.gz
+  samtools fastq -1 ${name}_R1.fastq.gz -2 ${name}_R2.fastq.gz -s ${name}_S.fastq.gz
   for file in *.fastq.gz
   do
     check=`zcat \${file} | head -n 1 | wc -l`
